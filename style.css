@@ -1,0 +1,44 @@
+/**body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+header {
+    background-color: #007BFF;
+    color: white;
+    padding: 20px;
+    text-align: center;
+}
+
+.menu-bar {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+}
+
+.menu-bar li {
+    margin: 0 15px;
+}
+
+.menu-bar a {
+    color: rgb(0, 0, 0);
+    text-decoration: none;
+}
+
+#map {
+    flex: 1;
+    height: 80%;
+}
+
+#aqi-info {
+    padding: 20px;
+    background-color: #f8f9fa;
+}

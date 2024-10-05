@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mapEd</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            text-align: left;
+            padding: 20px;
+            background-color: #f8f9fa;
+            font-size: xx-large;
+            
+        }
+
+        nav {
+            display: flex;
+            justify-content: center;
+            background-color: #007bff;
+            padding: 10px;
+        }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            margin: 0 10px;
+            border-radius: 5px;
+        }
+
+        nav a:hover {
+            background-color: #0056b3;
+        }
+
+        #container {
+            display: flex;
+            flex: 1;
+            /* Make the container take up remaining space */
+        }
+
+        #map-container {
+            width: 50%;
+            /* Map occupies half the width */
+            height: 100%;
+            /* Full height */
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        #image-viewer {
+            width: 100%;
+            height: 100%;
+            display: none;
+            /* Hidden by default */
+        }
+
+        #info {
+            width: 50%;
+            /* Info section occupies the other half */
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .info-section {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f1f1f1;
+        }
+
+        footer {
+            text-align: center;
+            padding: 10px;
+            background-color: #f8f9fa;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1 id="head-title">mapEd</h1>
+    </header>
+    <nav>
+        <a href="#" onclick="loadLayer('air')">Air Quality Index</a>
+        <a href="#" onclick="loadLayer('population')">Population</a>
+        <a href="#" onclick="loadLayer('temperature')">Surface Temperature</a>
+        <a href="#" onclick="loadLayer('vegetation')">Vegetation Index</a>
+    </nav>
+    <div id="container">
+        <div id="map-container">
+            <div id="map"></div> <!-- The map div -->
+            <img id="image-viewer" src="" alt="Layer Image"> <!-- Image viewer -->
+        </div>
+        <div id="info">
+            <div class="info-section" id="region-details">
+                <h2>Region Details</h2>
+                <p id="description">Select a location on the map to see detailed AQI information.</p>
+                <div id="aqi-info"></div>
+            </div>
+            <div class="info-section" id="max-aqi">
+                <h3>Max AQI: <span id="max-value">N/A</span></h3>
+            </div>
+            <div class="info-section" id="min-aqi">
+                <h3>Min AQI: <span id="min-value">N/A</span></h3>
+            </div>
+            <div class="info-section" id="avg-aqi">
+                <h3>Avg AQI: <span id="avg-value">N/A</span></h3>
+            </div>
+        </div>
+    </div>
+    <footer>
+        <p>Data source:<a href="https://www.nasa.gov">https://www.nasa.gov</a></p>
+    </footer>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        // Initialize the map
+        const map = L.map('map').setView([20.5937, 78.9629], 5); // Center of India
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        let aqiData = [];
+
+        function loadLayer(layerType) {
+            const mapDiv = document.getElementById('map');
+            const imageViewer = document.getElementById('image-viewer');
+            const description = document.getElementById('description'); // Description section
+
+            // Hide AQI stats when not on the AQI layer
+            if (layerType === 'air') {
+                showAQIStats(); // Show AQI statistics
+                description.innerText = "This layer shows the Air Quality Index (AQI) for various regions. The markers show the AQI for different cities.Select locations to see the Air quality index of the respective places.";
+                restoreMap(); // Restore the map when switching to Air Quality
+                loadAirQualityData(); // Load AQI data
+            } else {
+                hideAQIStats(); // Hide AQI stats for other layers
+                if (layerType === 'population') {
+                    description.innerText = "This layer displays population data for various regions. The image below shows the population density of various regions.";
+                    showImage('population.jpeg');
+                } else if (layerType === 'temperature') {
+                    description.innerText = "This layer displays surface temperature data for various regions. The image below shows temperature variations.";
+                    showImage('temp.jpeg');
+                } else if (layerType === 'vegetation') {
+                    description.innerText = "This layer provides data on vegetation Index of various regions.";
+                    showImage('vegetation.jpg');
+                    loadFloodData(); // Handle flood data
+                }
+            }
+        }
+
+        // Function to show AQI statistics
+        function showAQIStats() {
+            document.getElementById('max-aqi').style.display = 'block';
+            document.getElementById('min-aqi').style.display = 'block';
+            document.getElementById('avg-aqi').style.display = 'block';
+        }
+
+        // Function to hide AQI statistics
+        function hideAQIStats() {
+            document.getElementById('max-aqi').style.display = 'none';
+            document.getElementById('min-aqi').style.display = 'none';
+            document.getElementById('avg-aqi').style.display = 'none';
+        }
+
+        // Function to show the image and hide the map
+        function showImage(imagePath) {
+            const mapDiv = document.getElementById('map');
+            const imageViewer = document.getElementById('image-viewer');
+            mapDiv.style.display = 'none'; // Hide the map
+            imageViewer.src = imagePath; // Set the image source
+            imageViewer.style.display = 'block'; // Show the image
+        }
+
+        // Function to restore the map and hide the image
+        function restoreMap() {
+            const mapDiv = document.getElementById('map');
+            const imageViewer = document.getElementById('image-viewer');
+            imageViewer.style.display = 'none'; // Hide the image
+            mapDiv.style.display = 'block'; // Show the map
+        }
+
+        function loadAirQualityData() {
+            fetch('air_quality.json') // Path to your AQI JSON file
+                .then(response => response.json())
+                .then(data => {
+                    aqiData = data.records; // Store data for calculations
+                    aqiData.forEach(record => {
+                        const latitude = parseFloat(record.latitude);
+                        const longitude = parseFloat(record.longitude);
+                        const city = record.city;
+                        const avgValue = record.avg_value;
+
+                        const popupInfo = `<strong>City:</strong> ${city}<br><strong>Average AQI:</strong> ${avgValue}`;
+
+                        // Add a marker to the map
+                        const marker = L.marker([latitude, longitude])
+                            .bindPopup(popupInfo)
+                            .addTo(map);
+
+                        // Event listener for marker click
+                        marker.on('click', () => {
+                            showDetails(record); // Show details when the marker is clicked
+                        });
+                    });
+
+                    // Calculate and update max, min, and avg values after markers are added
+                    updateAQIStats();
+                })
+                .catch(error => console.error('Error fetching data:', error));
+        }
+
+        function showDetails(record) {
+            // Update the AQI details
+            document.getElementById('aqi-info').innerHTML = `
+                <strong>City:</strong> ${record.city}<br>
+                <strong>Average AQI:</strong> ${record.avg_value}<br>
+                <strong>Place:</strong> ${record.place || 'N/A'}
+            `;
+        }
+
+        function updateAQIStats() {
+            if (aqiData.length === 0) {
+                document.getElementById('max-value').innerText = 'N/A';
+                document.getElementById('min-value').innerText = 'N/A';
+                document.getElementById('avg-value').innerText = 'N/A';
+                return;
+            }
+
+            const values = aqiData.map(r => r.avg_value).filter(value => value !== undefined && !isNaN(value));
+            const maxValue = Math.max(...values);
+            const minValue = Math.min(...values);
+            const avgValue = (values.reduce((sum, r) => sum + r, 0) / values.length).toFixed(2);
+
+            document.getElementById('max-value').innerText = maxValue;
+            document.getElementById('min-value').innerText = minValue;
+            document.getElementById('avg-value').innerText = avgValue;
+        }
+
+    </script>
+
+</body>
+
+</html>
